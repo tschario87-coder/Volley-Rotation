@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Interaktives Volleyballfeld: Positionen, Rotation und Ballwechsel im 5-1-System.">
+<meta name="theme-color" content="#0E5A6B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VB-Rotation">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0} img{max-width:100%} [hidden]{display:none!important}
+</style>
+<title>Volleyball-Rotation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: Hallenboden links (oben auf dem Handy), Steuerung + Spielerkarte rechts */
+:root{
+  --bg:#EAF0EF; --surface:#FFFFFF; --fg:#13262B; --muted:#4F6569; --line:#C9D6D5;
+  --floor:#E7894B; --floor-front:#EE9A60; --zone:#2C6E7F; --chalk:#FFFFFF;
+  --token:#FDFBF7; --token-fg:#13262B; --ball:#FFD23F; --accent:#0E5A6B; --accent-fg:#FFFFFF;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E181B; --surface:#16252A; --fg:#E6EFEE; --muted:#9DB2B4; --line:#2A3E43;
+  --floor:#B8622F; --floor-front:#C87038; --zone:#1D4A56; --chalk:#F4F1EA;
+  --token:#F4F1EA; --token-fg:#13262B; --ball:#FFD23F; --accent:#5FC0D3; --accent-fg:#0E181B; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E181B; --surface:#16252A; --fg:#E6EFEE; --muted:#9DB2B4; --line:#2A3E43;
+  --floor:#B8622F; --floor-front:#C87038; --zone:#1D4A56; --chalk:#F4F1EA;
+  --token:#F4F1EA; --token-fg:#13262B; --ball:#FFD23F; --accent:#5FC0D3; --accent-fg:#0E181B; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+.wrap{max-width:980px;margin:0 auto;display:grid;gap:20px}
+header h1{font-family:var(--display);font-weight:800;text-transform:uppercase;letter-spacing:.02em;font-size:2.2rem;line-height:1;margin:0;text-wrap:balance}
+header p{margin:6px 0 0;color:var(--muted);max-width:60ch}
+.main{display:grid;gap:20px;grid-template-columns:1fr}
+@media (min-width:780px){.main{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);align-items:start}}
+
+.court-col{display:grid;gap:10px;min-width:0}
+.court{position:relative;width:100%;max-width:470px;aspect-ratio:10/11;margin:0 auto;border-radius:10px;overflow:hidden;background:var(--zone)}
+.court svg{position:absolute;inset:0;width:100%;height:100%}
+.floor{fill:var(--floor)} .floor-front{fill:var(--floor-front)}
+.chalk{stroke:var(--chalk);fill:none}
+.net{stroke:var(--chalk);stroke-width:.14}
+.zone-num{fill:var(--chalk);opacity:.28;font-family:var(--display);font-weight:800;font-size:1.5px;text-anchor:middle;dominant-baseline:central}
+.zone-num.hi{opacity:.75}
+.arrow{stroke:var(--chalk);stroke-width:.05;stroke-dasharray:.14 .12;opacity:.55;fill:none}
+.arrowhead{fill:var(--chalk);opacity:.6}
+.lbl{fill:var(--chalk);font-family:var(--display);font-weight:700;font-size:.34px;letter-spacing:.03px;opacity:.85}
+
+.player{position:absolute;width:16%;transform:translate(-50%,-50%);display:grid;justify-items:center;gap:2px;
+  background:none;border:0;padding:0;cursor:pointer;font:inherit;color:inherit;
+  transition:left .85s cubic-bezier(.45,.05,.25,1),top .85s cubic-bezier(.45,.05,.25,1)}
+.disc{width:78%;aspect-ratio:1;border-radius:50%;background:var(--token);color:var(--token-fg);display:grid;place-items:center;
+  font-family:var(--display);font-weight:800;font-size:clamp(15px,4.4vw,22px);box-shadow:0 2px 0 rgba(0,0,0,.25);position:relative;transition:transform .2s, box-shadow .2s}
+.role{font-family:var(--display);font-weight:700;font-size:clamp(11px,2.8vw,13px);letter-spacing:.06em;text-transform:uppercase;
+  background:rgba(10,30,35,.55);color:#fff;padding:0 6px;border-radius:4px;line-height:1.5}
+.player.sel .disc{box-shadow:0 0 0 4px var(--ball),0 4px 10px rgba(0,0,0,.35);transform:scale(1.08)}
+.player:focus-visible{outline:none}
+.player:focus-visible .disc{box-shadow:0 0 0 4px var(--accent),0 0 0 7px var(--chalk)}
+.ballicon{position:absolute;right:-12%;top:-12%;width:42%;aspect-ratio:1;border-radius:50%;background:var(--ball);border:2px solid #13262B;
+  transition:opacity .3s}
+.ballicon[hidden]{display:block!important;opacity:0}
+
+.status{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 16px;max-width:470px;margin:0 auto;width:100%;
+  font-family:var(--display);font-weight:700;font-size:1.15rem;letter-spacing:.02em;text-transform:uppercase}
+.status span b{color:var(--accent)}
+
+.panel{display:grid;gap:14px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:12px;min-width:0}
+.card h2{font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:1rem;color:var(--muted);margin:0}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px}
+button.b{font:inherit;font-weight:700;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:10px 14px;cursor:pointer;min-height:44px}
+button.b:hover{border-color:var(--accent)}
+button.b:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button.b.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);flex:1 1 auto}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font:inherit;border:0;background:transparent;color:var(--fg);padding:10px 8px;cursor:pointer;min-height:44px;font-weight:700}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+.seg button:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.hint{color:var(--muted);margin:0;font-size:.95rem}
+
+.who{display:grid;gap:4px}
+.who label{font-size:.85rem;color:var(--muted)}
+.who input{font:inherit;font-weight:700;font-size:1.2rem;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg);color:var(--fg);width:100%}
+.who input:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px}
+dt{color:var(--muted);font-size:.9rem}
+dd{margin:0;font-weight:700}
+dd small{display:block;font-weight:400;color:var(--muted)}
+.path{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{font-family:var(--display);font-weight:800;font-size:1.1rem;min-width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  border:2px solid var(--line);font-variant-numeric:tabular-nums}
+.chip.now{background:var(--ball);border-color:var(--ball);color:#13262B}
+.sep{color:var(--muted)}
+.rules{margin:0;padding-left:1.1em;display:grid;gap:6px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.9rem;color:var(--muted)}
+.legend b{font-family:var(--display);color:var(--fg);letter-spacing:.05em}
+.ball{position:absolute;width:5.5%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);z-index:5;pointer-events:none;
+  background:radial-gradient(circle at 35% 30%,#fff 0 16%,var(--ball) 45%,#D9A300 100%);border:2px solid #1F4FA0;box-shadow:0 0 0 1px rgba(255,255,255,.6)}
+.shadow{position:absolute;width:5%;height:2.4%;border-radius:50%;background:rgba(0,0,0,.3);transform:translate(-50%,-50%);z-index:4;pointer-events:none}
+.player.hit .disc{animation:hit .35s ease-out}
+@keyframes hit{50%{transform:scale(1.2)}}
+button.b.ballbtn{background:var(--ball);color:#13262B;border-color:var(--ball);flex:1 1 auto}
+button.b:disabled{opacity:.5;cursor:default}
+.sublabel{font-size:.85rem;color:var(--muted);margin:0 0 -6px}
+@media (prefers-reduced-motion:reduce){.player{transition-duration:.01s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Volleyball-Rotation</h1>
+    <p>Tippe auf einen Spieler. Dann siehst du seine Position und wie er beim Rotieren und nach dem Aufschlag wandert.</p>
+  </header>
+
+  <div class="main">
+    <div class="court-col">
+      <div class="court" id="court">
+        <svg viewBox="0 0 10 11" aria-hidden="true">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+              <path class="arrowhead" d="M0,0 L10,5 L0,10 z"/>
+            </marker>
+          </defs>
+          <rect class="floor" x=".5" y=".6" width="9" height="9"/>
+          <rect class="floor-front" x=".5" y=".6" width="9" height="3"/>
+          <rect class="chalk" x=".5" y=".6" width="9" height="9" stroke-width=".06"/>
+          <line class="chalk" x1=".5" y1="3.6" x2="9.5" y2="3.6" stroke-width=".05"/>
+          <line class="net" x1=".2" y1=".6" x2="9.8" y2=".6"/>
+          <text class="lbl" x=".62" y=".42">NETZ</text>
+          <text class="lbl" x=".62" y="3.45">3-M-LINIE</text>
+          <text class="lbl" x=".62" y="10.0">GRUNDLINIE</text>
+          <g id="zones"></g>
+          <g>
+            <path class="arrow" marker-end="url(#ah)" d="M8.9,3.0 L8.9,6.1"/>
+            <path class="arrow" marker-end="url(#ah)" d="M7.0,8.6 L6.0,8.6"/>
+            <path class="arrow" marker-end="url(#ah)" d="M4.0,8.6 L3.0,8.6"/>
+            <path class="arrow" marker-end="url(#ah)" d="M1.1,6.1 L1.1,3.0"/>
+            <path class="arrow" marker-end="url(#ah)" d="M3.0,1.15 L4.0,1.15"/>
+            <path class="arrow" marker-end="url(#ah)" d="M6.0,1.15 L7.0,1.15"/>
+          </g>
+        </svg>
+        <div id="players"></div>
+        <div class="shadow" id="shadow" hidden></div>
+        <div class="ball" id="ball" hidden></div>
+      </div>
+      <div class="status">
+        <span>Rotation <b id="rotNum">1</b> / 6</span>
+        <span>Aufschlag: <b id="serverName">–</b></span>
+      </div>
+      <div class="legend">
+        <span><b>Z</b> Zuspiel</span><span><b>A</b> Aussen</span><span><b>M</b> Mitte</span><span><b>D</b> Diagonal</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <h2>Steuerung</h2>
+        <div class="btnrow">
+          <button class="b" id="back" type="button">◀ Zurück</button>
+          <button class="b primary" id="rotate" type="button">Rotieren ▶</button>
+        </div>
+        <p class="sublabel">Wer schlägt auf?</p>
+        <div class="seg" role="group" aria-label="Wer schlägt auf?">
+          <button type="button" id="svWir" aria-pressed="true">Wir</button>
+          <button type="button" id="svGeg" aria-pressed="false">Gegner</button>
+        </div>
+        <div class="btnrow">
+          <button class="b ballbtn" id="rally" type="button">🏐 Ballwechsel zeigen</button>
+        </div>
+        <p class="sublabel">Stellung</p>
+        <div class="seg" role="group" aria-label="Spielphase">
+          <button type="button" id="phBase" aria-pressed="true">Beim Aufschlag</button>
+          <button type="button" id="phPlay" aria-pressed="false">Nach dem Aufschlag</button>
+        </div>
+        <div class="btnrow">
+          <button class="b" id="play" type="button">Alle 6 Rotationen abspielen</button>
+          <button class="b" id="reset" type="button">Neu starten</button>
+        </div>
+        <p class="hint" id="phaseHint"></p>
+      </div>
+
+      <div class="card" id="info" aria-live="polite"></div>
+
+      <div class="card">
+        <h2>Regeln kurz</h2>
+        <ul class="rules">
+          <li>Gewinnt dein Team den Aufschlag zurück, <b>rotieren alle eine Position weiter</b>, im Uhrzeigersinn (2 → 1 → 6 → 5 → 4 → 3 → 2).</li>
+          <li>Wer auf <b>Position 1</b> steht, macht den Aufschlag.</li>
+          <li>Beim Aufschlag müssen alle in der richtigen Reihenfolge stehen. <b>Danach dürfen sie die Plätze wechseln.</b></li>
+          <li>Hinten (1, 5, 6): nicht blocken und nur hinter der 3-m-Linie abspringen.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const ROLES={
+    Z:{name:'Zuspiel',desc:'Spielt den 2. Ball und verteilt ihn an die Angreifer.',side:'R'},
+    A:{name:'Aussen',desc:'Greift meistens von links an. Nimmt auch den Aufschlag an.',side:'L'},
+    M:{name:'Mitte',desc:'Blockt in der Mitte und greift schnell an.',side:'M'},
+    D:{name:'Diagonal',desc:'Greift von rechts an. Steht immer gegenüber vom Zuspiel.',side:'R'}
+  };
+  const ORDER=['Z','A','M','D','A','M']; // Startposition 1..6
+  const DEFAULT_NAMES=['Amina','Burak','Chiara','Dawit','Elif','Filip'];
+  const POS={1:[8,7],2:[8,2.3],3:[5,2.3],4:[2,2.3],5:[2,7],6:[5,7]};
+  const POSNAME={1:'hinten rechts',2:'vorne rechts',3:'vorne Mitte',4:'vorne links',5:'hinten links',6:'hinten Mitte'};
+  const SERVE=[8.6,10.3];
+  const SIDEX={L:2,M:5,R:8};
+  const SIDENAME={L:'links',M:'in die Mitte',R:'rechts'};
+
+  let names=DEFAULT_NAMES.slice();
+  try{const s=JSON.parse(localStorage.getItem('vb-names')||'null'); if(Array.isArray(s)&&s.length===6) names=s.map(String);}catch(e){}
+
+  let rot=0, phase='base', sel=1, timer=null, serving='wir', override={}, rallyId=0;
+
+  const $=id=>document.getElementById(id);
+  const isFront=p=>p>=2&&p<=4;
+  const posOf=i=>(((i-rot)%6)+6)%6+1;
+  const backSide=r=>r==='Z'||r==='D'?'R':(r==='M'?'M':'L');
+  const frontSide=r=>ROLES[r].side;
+
+  // Zonen-Nummern
+  const zg=$('zones');
+  for(let p=1;p<=6;p++){
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('class','zone-num'); t.setAttribute('x',POS[p][0]); t.setAttribute('y',p>=2&&p<=4?2.5:7.2);
+    t.dataset.p=p; t.textContent=p; zg.appendChild(t);
+  }
+
+  // Spieler
+  const wrap=$('players'); const els=[];
+  ORDER.forEach((r,i)=>{
+    const b=document.createElement('button');
+    b.type='button'; b.className='player';
+    b.innerHTML='<span class="disc"><span class="ini"></span><span class="ballicon" hidden></span></span><span class="role">'+r+'</span>';
+    b.addEventListener('click',()=>{sel=i;render();});
+    wrap.appendChild(b); els.push(b);
+  });
+
+  function coords(i){
+    if(override[i]) return override[i];
+    const p=posOf(i), r=ORDER[i];
+    if(phase==='base') return (p===1&&serving==='wir')?SERVE:POS[p];
+    const front=isFront(p);
+    return [SIDEX[front?frontSide(r):backSide(r)], front?2.3:7];
+  }
+
+  function render(){
+    els.forEach((b,i)=>{
+      const [x,y]=coords(i);
+      b.style.left=(x/10*100)+'%'; b.style.top=(y/11*100)+'%';
+      b.classList.toggle('sel',i===sel);
+      b.querySelector('.ini').textContent=(names[i]||'?').slice(0,2);
+      b.querySelector('.ballicon').hidden=!(posOf(i)===1&&serving==='wir');
+      b.setAttribute('aria-label',names[i]+', '+ROLES[ORDER[i]].name+', Position '+posOf(i));
+      b.setAttribute('aria-pressed',i===sel?'true':'false');
+    });
+    const selPos=posOf(sel);
+    zg.querySelectorAll('.zone-num').forEach(t=>t.classList.toggle('hi',+t.dataset.p===selPos));
+    $('rotNum').textContent=rot+1;
+    showServer();
+    $('phBase').setAttribute('aria-pressed',phase==='base');
+    $('phPlay').setAttribute('aria-pressed',phase==='play');
+    $('svWir').setAttribute('aria-pressed',serving==='wir');
+    $('svGeg').setAttribute('aria-pressed',serving==='gegner');
+    $('phaseHint').textContent=phase==='base'
+      ? (serving==='wir'
+          ? 'Beim Aufschlag: Alle stehen auf ihrer Rotations-Position. Position 1 schlägt auf.'
+          : 'Der Gegner schlägt auf. Ihr steht in der Annahme, aber in der richtigen Reihenfolge.')
+      : 'Nach dem Aufschlag: Die Spieler wechseln auf ihre Spezial-Plätze. Vorne bleibt vorne, hinten bleibt hinten.';
+    renderInfo();
+  }
+
+  function renderInfo(){
+    const i=sel, r=ORDER[i], p=posOf(i), front=isFront(p);
+    const path=[]; for(let k=0;k<6;k++) path.push(((p-1-k)%6+6)%6+1);
+    const target=front?frontSide(r):backSide(r);
+    let extra='';
+    if(p===1&&phase==='base'&&serving==='wir') extra='<dt>Jetzt</dt><dd>Macht den Aufschlag 🏐</dd>';
+    $('info').innerHTML=
+      '<h2>Ausgewählt</h2>'+
+      '<div class="who"><label for="nameInput">Name (antippen zum Ändern)</label><input id="nameInput" maxlength="14" autocomplete="off"></div>'+
+      '<dl>'+
+        '<dt>Rolle</dt><dd>'+ROLES[r].name+' ('+r+')<small>'+ROLES[r].desc+'</small></dd>'+
+        '<dt>Position</dt><dd>'+p+' – '+POSNAME[p]+'<small>'+(front?'Vorne: Darf am Netz angreifen und blocken.':'Hinten: Nicht blocken. Angriff nur hinter der 3-m-Linie.')+'</small></dd>'+
+        extra+
+        '<dt>Nach dem Aufschlag</dt><dd>Geht '+(front?'vorne ':'hinten ')+SIDENAME[target]+(r==='M'&&!front?'<small>Oft wechselt hier der Libero ein.</small>':'')+'</dd>'+
+      '</dl>'+
+      '<div><h2 style="margin-bottom:8px">Weg beim Rotieren</h2><div class="path">'+
+        path.map((q,k)=>(k?'<span class="sep">→</span>':'')+'<span class="chip'+(k===0?' now':'')+'">'+q+'</span>').join('')+
+      '</div></div>';
+    const inp=$('nameInput'); inp.value=names[i];
+    inp.addEventListener('input',()=>{
+      names[i]=inp.value||'?';
+      try{localStorage.setItem('vb-names',JSON.stringify(names));}catch(e){}
+      els[i].querySelector('.ini').textContent=names[i].slice(0,2);
+      showServer();
+    });
+  }
+
+  function showServer(){
+    const srv=ORDER.findIndex((_,j)=>posOf(j)===1);
+    $('serverName').textContent=serving==='wir'?names[srv]:'Gegner';
+  }
+
+  // ---------- Ball ----------
+  const ball=$('ball'), shadow=$('shadow'), hintEl=$('phaseHint');
+  function placeBall(x,y,z){
+    shadow.style.left=(x*10)+'%'; shadow.style.top=(y/11*100)+'%';
+    ball.style.left=(x*10)+'%'; ball.style.top=((y-z*0.45)/11*100)+'%';
+    ball.style.transform='translate(-50%,-50%) scale('+(1+z*0.12).toFixed(3)+')';
+  }
+  function fly(a,b,dur,h){
+    const id=rallyId;
+    return new Promise(res=>{
+      const t0=performance.now();
+      function f(now){
+        if(id!==rallyId){res(false);return;}
+        const t=Math.min(1,(now-t0)/dur);
+        placeBall(a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t+4*h*t*(1-t));
+        if(t<1) requestAnimationFrame(f); else res(true);
+      }
+      requestAnimationFrame(f);
+    });
+  }
+  function wait(ms){const id=rallyId;return new Promise(r=>setTimeout(()=>r(id===rallyId),ms));}
+  function hit(i){const b=els[i];b.classList.remove('hit');void b.offsetWidth;b.classList.add('hit');}
+  function showBall(on){ball.hidden=!on;shadow.hidden=!on;}
+  function cancelRally(){rallyId++;showBall(false);override={};$('rally').disabled=false;}
+
+  async function rally(){
+    stop(); cancelRally(); phase='base'; render();
+    $('rally').disabled=true;
+    if(serving==='wir'){
+      const s=ORDER.findIndex((_,i)=>posOf(i)===1);
+      const hand=[SERVE[0]-0.4,SERVE[1]-0.3,0.6];
+      placeBall(hand[0],hand[1],hand[2]); showBall(true);
+      hintEl.textContent=names[s]+' wirft den Ball hoch …';
+      if(!await fly(hand,hand,700,1.5)) return;
+      hit(s);
+      phase='play'; render();
+      hintEl.textContent=names[s]+' schlägt auf. Jetzt wechseln alle auf ihre Plätze.';
+      if(!await fly(hand,[4.5,-1.8,1.4],1100,2.6)) return;
+      hintEl.textContent='Der Ball ist beim Gegner. Alle stehen jetzt auf ihren Spezial-Plätzen.';
+    } else {
+      const rec=ORDER.findIndex((r,i)=>r==='A'&&!isFront(posOf(i)));
+      const set=ORDER.indexOf('Z');
+      const att=ORDER.findIndex((r,i)=>r==='A'&&isFront(posOf(i)));
+      const rp=coords(rec), recBall=[rp[0],rp[1]-0.3,0.3];
+      const setBall=[6.6,1.9,0.7];
+      placeBall(5.5,-1.8,2); showBall(true);
+      hintEl.textContent='Der Gegner schlägt auf. '+names[rec]+' nimmt den Ball an.';
+      if(!await fly([5.5,-1.8,2],recBall,1200,3)) return;
+      hit(rec);
+      phase='play'; override[set]=[6.6,2.0]; render();
+      hintEl.textContent='Annahme zum Zuspiel. Alle wechseln auf ihre Plätze.';
+      if(!await fly(recBall,setBall,1000,2.4)) return;
+      hit(set);
+      hintEl.textContent=names[set]+' spielt den Ball zu '+names[att]+'.';
+      const ap=coords(att), attBall=[ap[0],ap[1]-0.3,1.5];
+      if(!await fly(setBall,attBall,900,1.6)) return;
+      hit(att);
+      hintEl.textContent=names[att]+' greift an!';
+      if(!await fly(attBall,[3.8,-1.8,0],420,0.15)) return;
+      hintEl.textContent='Punkt! Ihr gewinnt den Ballwechsel. Darum rotiert ihr jetzt und schlagt selbst auf.';
+      showBall(false);
+      if(!await wait(1800)) return;
+      override={}; serving='wir'; rot=(rot+1)%6; phase='base'; render();
+      const s=ORDER.findIndex((_,i)=>posOf(i)===1);
+      hintEl.textContent='Rotiert! Jetzt schlägt '+names[s]+' von Position 1 auf.';
+    }
+    showBall(false); $('rally').disabled=false;
+  }
+
+  function stop(){ if(timer){clearInterval(timer);timer=null;$('play').textContent='Alle 6 Rotationen abspielen';} }
+  function step(d){ cancelRally(); phase='base'; rot=((rot+d)%6+6)%6; render(); }
+
+  $('rally').onclick=rally;
+  $('svWir').onclick=()=>{stop();cancelRally();serving='wir';phase='base';render();};
+  $('svGeg').onclick=()=>{stop();cancelRally();serving='gegner';phase='base';render();};
+  $('rotate').onclick=()=>{stop();step(1);};
+  $('back').onclick=()=>{stop();step(-1);};
+  $('phBase').onclick=()=>{stop();cancelRally();phase='base';render();};
+  $('phPlay').onclick=()=>{stop();cancelRally();phase='play';render();};
+  $('reset').onclick=()=>{stop();cancelRally();rot=0;phase='base';render();};
+  $('play').onclick=()=>{
+    if(timer){stop();return;}
+    cancelRally();
+    $('play').textContent='Stopp';
+    let n=0; phase='base'; render();
+    timer=setInterval(()=>{
+      if(phase==='base'){phase='play';render();return;}
+      n++; if(n>=6){step(1);stop();return;}
+      step(1);
+    },1400);
+  };
+
+  render();
+})();
+</script>
+<script>
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));}
+</script>
+</body>
+</html>
